@@ -68,15 +68,36 @@ class SAMLController extends Controller
             return $this->getRedirect();
         }
 
+
+        $member = new Member();
+        $attributes = $auth->getAttributes();
+        $email = null;
+        foreach ($member->config()->claims_field_mappings as $claim => $field) {
+            if (!isset($attributes[$claim][0])) {
+                SS_Log::log(
+                    sprintf(
+                        'Claim rule \'%s\' configured in LDAPMember.claims_field_mappings, but wasn\'t passed through. Please check IdP claim rules.',
+                        $claim
+                    ), SS_Log::WARN
+                );
+
+                continue;
+            }
+
+            $member->$field = $attributes[$claim][0];
+
+            if($field == 'Email'){
+                $email = $attributes[$claim][0];
+            }
+        }
+
         // Write a rudimentary member with basic fields on every login, so that we at least have something
         // if LDAP synchronisation fails.
-        $member = Member::get()->filter('GUID', $guid)->limit(1)->first();
+        $member = Member::get()->filter('Email', $email)->limit(1)->first();
         if (!($member && $member->exists())) {
             $member = new Member();
             $member->GUID = $guid;
         }
-
-        $attributes = $auth->getAttributes();
 
         foreach ($member->config()->claims_field_mappings as $claim => $field) {
             if (!isset($attributes[$claim][0])) {
